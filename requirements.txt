@@ -1,6 +1,7 @@
 streamlit
+openai
 openai-whisper
 torch
 numpy
-openai
 gTTS
+streamlit-audiorec
