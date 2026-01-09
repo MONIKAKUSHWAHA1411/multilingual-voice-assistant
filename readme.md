@@ -1,91 +1,132 @@
-This project implements a BFSI Multilingual Voice Assistant that enables banks to:
+BFSI Multilingual Voice Assistant
 
-Upload recorded customer calls OR
+Purpose-built Voice AI for Banking & Financial Services
 
-Process customer queries via text input
+🔍 Overview
 
-The assistant:
+BFSI Multilingual Voice Assistant is a production-style AI prototype designed for banking and financial services use cases such as customer support analysis, intent detection, and multilingual call understanding.
 
-Transcribes audio conversations
+The system accepts uploaded call recordings or typed customer queries, automatically transcribes them, detects the language, classifies the banking intent, and returns a structured response — all in a clean, compliant, enterprise-ready UI.
 
-Detects the spoken language
+This project is built to mirror real-world BFSI workflows, where banks process recorded customer calls at scale, rather than interacting live on behalf of customers.
 
-Identifies the banking intent
+🎯 Why This Project Exists
 
-Generates a professional BFSI-safe response
+Banks and NBFCs handle:
 
-Optionally responds back via voice output
+Thousands of multilingual customer calls daily
 
-Functional Requirements (Modified)
-1. Input Handling
+Regulatory constraints (RBI, GDPR, HIPAA)
 
-Support audio file upload (WAV / MP3) for recorded customer calls
+Need for accurate intent classification over free-flowing speech
 
-Support text-based queries for chat or CRM use cases
+Heavy post-call analytics and audit requirements
 
-Designed so banks can analyze conversations without speaking on behalf of customers
+This project demonstrates how GenAI + Voice AI can solve these challenges without replacing human agents, but by augmenting operations, QA, and analytics.
 
-2. Speech-to-Text
+🧠 Key Capabilities
+🎧 Audio Upload (Primary BFSI Flow)
 
-Convert multilingual customer audio into text
+Upload WAV / MP3 call recordings
 
-Handle English, Hindi, and Hinglish seamlessly
+Designed for post-call processing
 
-3. Language Detection
+Handles English, Hindi, and Hinglish seamlessly
 
-Automatically identify the language of the customer query
+✍️ Text Input (Fallback / QA Mode)
 
-Adapt responses accordingly
+Paste customer queries directly
 
-4. BFSI Intent Classification
+Useful for QA teams, demos, and testing edge cases
 
-The system must identify customer intent from a predefined BFSI taxonomy, including but not limited to:
+🗣️ Multilingual Transcription
 
-Account balance
+Automatic speech-to-text
 
-Transaction history
+Robust for Indian accents and code-mixed language
 
-Debit / credit card block
+🌐 Language Detection
 
-Loan EMI queries
+Identifies spoken language automatically
 
-KYC updates
+Enables region-specific analytics
 
-Fraud reporting
+🧭 BFSI Intent Classification (20+ intents)
 
-Net banking issues
+Examples:
 
-General banking support
-(20+ intents supported)
+Balance Inquiry
 
-5. Intelligent Response Generation
+Account Type Check
 
-Generate clear, professional, and compliant responses
+Card Block / Unblock
 
-Avoid assumptions about sensitive customer data
+Loan Status
 
-Maintain BFSI-appropriate tone and safety
+EMI / Repayment
 
-6. Voice Response (Optional)
+KYC / Document Update
 
-Convert assistant responses into audio output
+Branch / ATM Info
 
-Useful for QA review, demos, and voice-bot simulations
+Fraud Reporting
 
-7. UI & UX
+Interest Rate Query
 
-Clean, modern UI inspired by BFSI product interfaces
+Statement Request
+(and more)
 
-Simple input flow for non-technical users
+🧩 Modular Architecture
 
-Optimized for demo and stakeholder presentation
+Easy to extend with:
 
-🚀 Non-Functional Requirements
+CRM integrations
 
-Scalable for large volumes of customer conversations
+Ticketing systems
 
-Safe handling of customer data (no PII storage)
+Call quality scoring
 
-Cost-efficient using free / lightweight LLM APIs
+Sentiment analysis
 
-Easy to deploy on cloud platforms (Streamlit Cloud)
+Compliance checks
+
+🏗️ Architecture (High Level)
+Audio / Text Input
+        ↓
+Speech-to-Text
+        ↓
+Language Detection
+        ↓
+BFSI Intent Classification
+        ↓
+Structured Output for Ops / QA / Analytics
+
+🛠️ Tech Stack
+
+Frontend: Streamlit (custom dark BFSI UI)
+
+Speech Processing: Whisper-based transcription
+
+Language Detection: langdetect
+
+Intent Classification: LLM-based zero-shot reasoning
+
+Deployment: Streamlit Community Cloud
+
+Design Philosophy: Compliance-first, enterprise-ready
+
+🧪 Why This Is Not “Just Another Demo”
+
+This project intentionally:
+
+Avoids chatbot gimmicks
+
+Focuses on bank-realistic workflows
+
+Prioritizes upload-based call analysis
+
+Handles multilingual Indian banking scenarios
+
+Separates customer interaction from bank processing
+
+This mirrors how real BFSI AI systems are actually deployed.
