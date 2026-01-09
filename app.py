@@ -2,150 +2,147 @@ import streamlit as st
 import whisper
 import tempfile
 import os
+from gtts import gTTS
+import openai
 
-# -------------------------------------------------
-# Page config
-# -------------------------------------------------
+# -----------------------------
+# CONFIG
+# -----------------------------
 st.set_page_config(
     page_title="Multilingual Voice Assistant",
     page_icon="🎙️",
     layout="centered"
 )
 
-# -------------------------------------------------
-# Title
-# -------------------------------------------------
 st.title("🎙 Multilingual Voice Assistant")
 st.write("Upload an audio file (English / Hindi / Hinglish)")
 
-# -------------------------------------------------
-# Intent Detection (Knowledge-base driven)
-# -------------------------------------------------
-def detect_intent(text: str) -> str:
-    text = text.lower()
+# -----------------------------
+# OpenAI API Key (Streamlit Secrets)
+# -----------------------------
+openai.api_key = st.secrets["OPENAI_API_KEY"]
 
-    balance_keywords = [
-        "balance", "account balance", "kitna paisa", "paise", "amount"
-    ]
+# -----------------------------
+# LLM-Based Intent Detection
+# -----------------------------
+def llm_intent_classification(user_text: str) -> dict:
+    system_prompt = """
+You are an enterprise banking voice assistant.
+Classify the user's query into one of the following intents:
 
-    transaction_keywords = [
-        "transaction", "last transaction", "debit", "credit", "spent", "kal"
-    ]
+1. Account Balance
+2. Transaction History
+3. Card Block / Lost Card
+4. Account Conversion / Account Type Change
+5. Card Eligibility / Replacement
+6. Fees & Charges
+7. General Banking Query
 
-    card_block_keywords = [
-        "block card", "card block", "lost card", "stolen card", "freeze card"
-    ]
+Return a JSON with:
+- intent
+- reasoning (short explanation)
+"""
 
-    account_conversion_keywords = [
-        "salary account",
-        "savings account",
-        "convert",
-        "change account",
-        "account type",
-        "upgrade account"
-    ]
-
-    card_eligibility_keywords = [
-        "new card",
-        "apply for card",
-        "card converted",
-        "replace card",
-        "existing card",
-        "card validity"
-    ]
-
-    fees_keywords = [
-        "charges", "fees", "minimum balance", "penalty"
-    ]
-
-    # Order matters – higher intent first
-    if any(word in text for word in account_conversion_keywords):
-        return "Account Conversion / Account Type Change"
-
-    elif any(word in text for word in card_eligibility_keywords):
-        return "Card Eligibility / Replacement"
-
-    elif any(word in text for word in card_block_keywords):
-        return "Card Block / Lost Card"
-
-    elif any(word in text for word in transaction_keywords):
-        return "Transaction History"
-
-    elif any(word in text for word in balance_keywords):
-        return "Account Balance"
-
-    elif any(word in text for word in fees_keywords):
-        return "Fees & Charges"
-
-    else:
-        return "General Banking Query"
-
-# -------------------------------------------------
-# Suggested BFSI-style response
-# -------------------------------------------------
-def suggested_response(intent: str) -> str:
-    responses = {
-        "Account Conversion / Account Type Change":
-            "Account conversion depends on eligibility and employer documentation. In most cases, existing debit cards continue to work, but some banks may issue a new card. Please check with customer support for exact policy.",
-
-        "Card Eligibility / Replacement":
-            "Card eligibility depends on your account type and usage. You may apply for a new card via net banking, mobile app, or by visiting a branch.",
-
-        "Card Block / Lost Card":
-            "Please block your card immediately using mobile banking or customer support to prevent unauthorized transactions.",
-
-        "Transaction History":
-            "You can view your recent transactions through mobile banking, net banking, or by requesting a mini statement.",
-
-        "Account Balance":
-            "You can check your account balance using mobile banking, SMS banking, ATM, or net banking services.",
-
-        "Fees & Charges":
-            "Charges vary by account type. Please refer to the bank’s official schedule of charges or contact support."
-    }
-
-    return responses.get(
-        intent,
-        "Please contact customer support for detailed assistance regarding your query."
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_text}
+        ],
+        temperature=0.2
     )
 
-# -------------------------------------------------
+    return eval(response.choices[0].message.content)
+
+# -----------------------------
+# BFSI-Compliant Response Generation
+# -----------------------------
+def generate_bfsi_response(intent: str, user_text: str) -> str:
+    system_prompt = """
+You are a compliant Indian banking voice assistant.
+Rules:
+- Do NOT give financial advice
+- Do NOT promise approvals
+- Keep tone professional, clear, human
+- Short response
+"""
+
+    response = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {
+                "role": "user",
+                "content": f"""
+User query: {user_text}
+Detected intent: {intent}
+Generate a helpful response.
+"""
+            }
+        ],
+        temperature=0.4
+    )
+
+    return response.choices[0].message.content.strip()
+
+# -----------------------------
+# Voice Reply (TTS)
+# -----------------------------
+def generate_voice(text: str, lang: str):
+    tts = gTTS(text=text, lang="hi" if lang == "hi" else "en")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as audio_file:
+        tts.save(audio_file.name)
+        return audio_file.name
+
+# -----------------------------
 # File Upload
-# -------------------------------------------------
+# -----------------------------
 uploaded_file = st.file_uploader(
     "Upload audio file",
     type=["wav", "mp3"]
 )
 
-# -------------------------------------------------
+# -----------------------------
 # Processing
-# -------------------------------------------------
-if uploaded_file is not None:
+# -----------------------------
+if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(uploaded_file.read())
         audio_path = tmp.name
 
-    st.info("Transcribing audio...")
+    st.info("Transcribing audio…")
 
-    # Load Whisper model
     model = whisper.load_model("base")
     result = model.transcribe(audio_path)
-
     os.remove(audio_path)
 
-    # -------------------------------------------------
-    # Output
-    # -------------------------------------------------
+    user_text = result["text"]
+    language = result["language"]
+
     st.subheader("📝 Transcription")
-    st.write(result["text"])
+    st.write(user_text)
 
     st.subheader("🌍 Detected Language")
-    st.write(result["language"])
+    st.write(language)
 
-    intent = detect_intent(result["text"])
+    with st.spinner("Understanding intent…"):
+        intent_data = llm_intent_classification(user_text)
 
     st.subheader("🧠 Detected Intent")
-    st.write(intent)
+    st.write(intent_data["intent"])
 
-    st.subheader("💡 Suggested Response")
-    st.write(suggested_response(intent))
+    st.subheader("🔍 Reasoning")
+    st.write(intent_data["reasoning"])
+
+    with st.spinner("Generating response…"):
+        response_text = generate_bfsi_response(intent_data["intent"], user_text)
+
+    st.subheader("💬 Assistant Response")
+    st.write(response_text)
+
+    voice_path = generate_voice(response_text, language)
+
+    st.subheader("🔊 Voice Reply")
+    st.audio(voice_path)
+
+    os.remove(voice_path)
