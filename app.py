@@ -1,235 +1,98 @@
 import streamlit as st
-import tempfile
 import os
-from langdetect import detect
 import google.generativeai as genai
-import whisper
-from gtts import gTTS
 
-# --------------------------------------------------
-# Page Config
-# --------------------------------------------------
+# -----------------------------
+# Page config
+# -----------------------------
 st.set_page_config(
-    page_title="BFSI Multilingual Voice Assistant",
-    page_icon="🎙️",
+    page_title="Multilingual AI Assistant",
+    page_icon="🌍",
     layout="centered"
 )
 
-# --------------------------------------------------
-# Secrets & API Setup
-# --------------------------------------------------
-GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-genai.configure(api_key=GEMINI_API_KEY)
+# -----------------------------
+# App title
+# -----------------------------
+st.title("🌍 Multilingual AI Assistant")
+st.caption("AI-powered assistant designed for multilingual service operations")
 
-# --------------------------------------------------
-# UI Styling (Oriserve-style)
-# --------------------------------------------------
-st.markdown("""
-<style>
-body {
-    background-color: #0b1220;
-}
-.header-box {
-    background: linear-gradient(90deg, #2563eb, #3b82f6);
-    padding: 28px;
-    border-radius: 14px;
-    text-align: center;
-    color: white;
-    margin-bottom: 30px;
-}
-.subtext {
-    color: #dbeafe;
-    font-size: 14px;
-    margin-top: 6px;
-}
-.section-title {
-    font-size: 22px;
-    font-weight: 600;
-    margin-top: 30px;
-}
-.small-note {
-    font-size: 13px;
-    color: #94a3b8;
-}
-</style>
-""", unsafe_allow_html=True)
+# -----------------------------
+# Load API Key
+# -----------------------------
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
-# --------------------------------------------------
-# Header
-# --------------------------------------------------
-st.markdown("""
-<div class="header-box">
-    <h2>🎙️ BFSI Multilingual Voice Assistant</h2>
-    <div class="subtext">
-        Purpose-built Voice AI for Banking & Financial Services
-    </div>
-</div>
-""", unsafe_allow_html=True)
+if not GOOGLE_API_KEY:
+    st.error("Google API key not found. Please add it in Streamlit Secrets.")
+    st.stop()
 
-# --------------------------------------------------
-# Load Whisper (cached)
-# --------------------------------------------------
-@st.cache_resource
-def load_whisper():
-    return whisper.load_model("base")
+genai.configure(api_key=GOOGLE_API_KEY)
 
-whisper_model = load_whisper()
+# -----------------------------
+# Model setup (Free & Stable)
+# -----------------------------
+MODEL_NAME = "gemini-1.5-flash"
+model = genai.GenerativeModel(MODEL_NAME)
 
-# --------------------------------------------------
-# BFSI Intent Taxonomy (20+)
-# --------------------------------------------------
-BFSI_INTENTS = [
-    "Account Balance",
-    "Mini Statement",
-    "Transaction History",
-    "Debit Card Block",
-    "Credit Card Block",
-    "Card Replacement",
-    "UPI Issue",
-    "ATM Issue",
-    "Loan EMI Query",
-    "Loan Foreclosure",
-    "Interest Rate Query",
-    "KYC Update",
-    "Address Change",
-    "Mobile Number Update",
-    "Net Banking Issue",
-    "Forgot Password",
-    "Fraud Report",
-    "Dispute Transaction",
-    "Cheque Book Request",
-    "Account Closure",
-    "General Banking Query",
-    "Other"
-]
+# -----------------------------
+# Session state
+# -----------------------------
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
 
-# --------------------------------------------------
-# Gemini Intent + Response
-# --------------------------------------------------
-def gemini_bfsi_response(user_text):
-    model = genai.GenerativeModel("gemini-1.5-flash")
+# -----------------------------
+# Input section
+# -----------------------------
+st.subheader("💬 Ask something")
 
-    prompt = f"""
-You are a BFSI virtual assistant for Indian banking customers.
-
-TASKS:
-1. Identify the most relevant intent from this list:
-{BFSI_INTENTS}
-
-2. Respond in a polite, professional BFSI tone.
-3. Keep response concise and safe (no PII assumptions).
-
-USER QUERY:
-\"\"\"{user_text}\"\"\"
-
-OUTPUT FORMAT:
-Intent:
-Response:
-"""
-
-    result = model.generate_content(prompt)
-    return result.text
-
-# --------------------------------------------------
-# Text-to-Speech (Free)
-# --------------------------------------------------
-def speak(text, lang):
-    tts = gTTS(text=text, lang=lang)
-    audio_path = tempfile.mktemp(suffix=".mp3")
-    tts.save(audio_path)
-    return audio_path
-
-# --------------------------------------------------
-# Input Options
-# --------------------------------------------------
-st.markdown("<div class='section-title'>🎧 Input Options</div>", unsafe_allow_html=True)
-
-input_mode = st.radio(
-    "Choose input type:",
-    ["Upload recorded call (WAV / MP3)", "Type text message"],
-    horizontal=True
+user_input = st.text_area(
+    "Enter your message (any language)",
+    placeholder="Example: Explain AI automation in simple terms",
+    height=120
 )
 
-user_text = None
+# -----------------------------
+# Generate response
+# -----------------------------
+if st.button("Generate Response"):
+    if not user_input.strip():
+        st.warning("Please enter a message.")
+    else:
+        with st.spinner("Thinking..."):
+            try:
+                response = model.generate_content(
+                    f"""
+You are a helpful AI assistant designed for service operations.
+Respond clearly, politely, and concisely.
+If the input is not in English, respond in the same language.
 
-# --------------------------------------------------
-# Option 1: Upload Audio
-# --------------------------------------------------
-if input_mode == "Upload recorded call (WAV / MP3)":
-    audio_file = st.file_uploader(
-        "Upload customer call recording",
-        type=["wav", "mp3"]
-    )
+User query:
+{user_input}
+"""
+                )
 
-    if audio_file:
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(audio_file.read())
-            audio_path = tmp.name
+                answer = response.text
 
-        with st.spinner("Transcribing audio..."):
-            result = whisper_model.transcribe(audio_path)
-            user_text = result["text"]
+                st.session_state.chat_history.append(
+                    {"user": user_input, "assistant": answer}
+                )
 
-        st.subheader("📝 Transcription")
-        st.write(user_text)
+            except Exception as e:
+                st.error(f"Something went wrong: {e}")
 
-# --------------------------------------------------
-# Option 2: Text Input
-# --------------------------------------------------
-else:
-    user_text = st.text_area(
-        "Enter customer query",
-        placeholder="Eg: Mere savings account mein kitna balance hai?"
-    )
+# -----------------------------
+# Chat history
+# -----------------------------
+if st.session_state.chat_history:
+    st.subheader("🗂 Conversation")
+    for chat in reversed(st.session_state.chat_history):
+        st.markdown("**You:**")
+        st.write(chat["user"])
+        st.markdown("**Assistant:**")
+        st.write(chat["assistant"])
+        st.divider()
 
-# --------------------------------------------------
-# Processing
-# --------------------------------------------------
-if user_text:
-    try:
-        lang = detect(user_text)
-    except:
-        lang = "en"
-
-    st.subheader("🌐 Detected Language")
-    st.write(lang)
-
-    with st.spinner("Understanding intent & generating response..."):
-        output = gemini_bfsi_response(user_text)
-
-    # Parse output
-    intent = "Unknown"
-    response = output
-
-    if "Intent:" in output and "Response:" in output:
-        intent = output.split("Intent:")[1].split("Response:")[0].strip()
-        response = output.split("Response:")[1].strip()
-
-    st.subheader("🧠 Detected Intent")
-    st.write(intent)
-
-    st.subheader("💬 Assistant Response")
-    st.write(response)
-
-    # Voice reply
-    try:
-        voice_path = speak(response, "hi" if lang == "hi" else "en")
-        st.audio(voice_path)
-    except:
-        st.warning("Voice reply unavailable for this language.")
-
-# --------------------------------------------------
+# -----------------------------
 # Footer
-# --------------------------------------------------
-st.divider()
-st.markdown("""
-<div style="text-align:center; font-size:13px; color:#94a3b8; padding:20px 0;">
-    Built for <b>BFSI Voice AI</b><br/>
-    Made by 
-    <a href="https://www.linkedin.com/in/monika-kushwaha-52443735/"
-       target="_blank"
-       style="color:#60a5fa; text-decoration:none; font-weight:500;">
-       Monika Kushwaha
-    </a>
-</div>
-""", unsafe_allow_html=True)
+# -----------------------------
+st.caption("Built using Streamlit + Google Gemini | Scalable AI assistant demo")
