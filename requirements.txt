@@ -1,7 +1,4 @@
-
-streamlit-audiorec
 streamlit
 openai>=1.0.0
-whisper
 gtts
 langdetect
