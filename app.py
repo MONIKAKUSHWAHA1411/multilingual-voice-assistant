@@ -4,32 +4,31 @@ import time
 from langdetect import detect
 from gtts import gTTS
 from openai import OpenAI
+import google.generativeai as genai
 
-# =============================
+# ==================================================
 # Page Config
-# =============================
+# ==================================================
 st.set_page_config(
     page_title="BFSI Multilingual Voice Assistant",
     layout="centered"
 )
 
-# =============================
-# Session Guards (IMPORTANT)
-# =============================
+# ==================================================
+# Session Guards (Rate-limit + caching)
+# ==================================================
 if "last_call_time" not in st.session_state:
     st.session_state.last_call_time = 0
 
 if "cached_result" not in st.session_state:
     st.session_state.cached_result = None
 
-# =============================
-# Oriserve-style CSS
-# =============================
+# ==================================================
+# Oriserve-style UI CSS
+# ==================================================
 st.markdown("""
 <style>
-body {
-    background-color:#0b1220;
-}
+body { background-color:#0b1220; }
 .header {
     background: linear-gradient(90deg, #2563eb, #3b82f6);
     padding:22px;
@@ -52,16 +51,13 @@ body {
     border-radius:10px;
     font-size:14px;
 }
-.small {
-    font-size:13px;
-    color:#94a3b8;
-}
+.small { font-size:13px; color:#94a3b8; }
 </style>
 """, unsafe_allow_html=True)
 
-# =============================
+# ==================================================
 # Header
-# =============================
+# ==================================================
 st.markdown("""
 <div class="header">
     <h1>🎙️ BFSI Multilingual Voice Assistant</h1>
@@ -69,14 +65,17 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# =============================
-# OpenAI Client
-# =============================
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+# ==================================================
+# API Clients
+# ==================================================
+openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# =============================
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+
+# ==================================================
 # BFSI Intent Taxonomy (20+)
-# =============================
+# ==================================================
 INTENTS = {
     "Account Balance Inquiry": ["balance", "kitna", "remaining"],
     "Mini Statement": ["mini statement", "last transactions"],
@@ -102,57 +101,57 @@ INTENTS = {
 }
 
 def detect_intent(text):
-    text = text.lower()
+    t = text.lower()
     for intent, keys in INTENTS.items():
-        if any(k in text for k in keys):
+        if any(k in t for k in keys):
             return intent
     return "General Banking Query"
 
-# =============================
+# ==================================================
 # Speech-to-Text (OpenAI)
-# =============================
+# ==================================================
 def transcribe(audio_path):
     with open(audio_path, "rb") as audio:
-        transcript = client.audio.transcriptions.create(
+        transcript = openai_client.audio.transcriptions.create(
             file=audio,
             model="gpt-4o-transcribe"
         )
     return transcript.text
 
-# =============================
-# LLM Reply
-# =============================
+# ==================================================
+# Gemini LLM Reply
+# ==================================================
 def generate_reply(text, intent, lang):
     prompt = f"""
 You are a BFSI virtual assistant.
-Detected intent: {intent}
+
 User language: {lang}
+Detected intent: {intent}
 
-Respond politely, clearly, and in a compliant banking tone.
-Do not expose sensitive data.
+Rules:
+- Be polite and professional
+- Follow banking compliance tone
+- Do NOT expose sensitive customer data
+- Keep response concise and helpful
+
+User query:
+{text}
 """
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": text}
-        ],
-        temperature=0.2
-    )
-    return response.choices[0].message.content
+    response = gemini_model.generate_content(prompt)
+    return response.text.strip()
 
-# =============================
+# ==================================================
 # Text-to-Speech
-# =============================
+# ==================================================
 def speak(text, lang):
     tts = gTTS(text=text, lang="hi" if lang == "hi" else "en")
     path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
     tts.save(path)
     return path
 
-# =============================
+# ==================================================
 # Input Options
-# =============================
+# ==================================================
 st.markdown("## 🎧 Input Options")
 
 mic_audio = st.audio_input("🎙️ Speak now")
@@ -168,16 +167,16 @@ if st.button("🔄 Reset Conversation"):
 
 audio = mic_audio or uploaded_file
 
-# =============================
+# ==================================================
 # Processing (Rate-limit safe)
-# =============================
+# ==================================================
 COOLDOWN_SECONDS = 15
 
 if audio:
     now = time.time()
 
     if now - st.session_state.last_call_time < COOLDOWN_SECONDS:
-        st.warning("⏳ Please wait a few seconds before submitting another audio.")
+        st.warning("⏳ Voice services are under high load. Please retry shortly.")
         st.stop()
 
     st.session_state.last_call_time = now
@@ -186,7 +185,7 @@ if audio:
         user_text, lang, intent, reply, voice_reply = st.session_state.cached_result
     else:
         try:
-            with st.spinner("Processing voice..."):
+            with st.spinner("Processing voice input..."):
                 with tempfile.NamedTemporaryFile(delete=False) as tmp:
                     tmp.write(audio.read())
                     audio_path = tmp.name
@@ -202,14 +201,12 @@ if audio:
                 )
 
         except Exception:
-            st.error(
-                "⚠️ Voice services are temporarily busy. Please try again shortly."
-            )
+            st.warning("⚠️ Voice services are temporarily busy. Please try again shortly.")
             st.stop()
 
-    # =============================
+    # ==================================================
     # Output
-    # =============================
+    # ==================================================
     st.markdown("### 📝 Transcription")
     st.write(user_text)
 
@@ -225,9 +222,9 @@ if audio:
     st.markdown("### 🔊 Voice Reply")
     st.audio(voice_reply)
 
-# =============================
+# ==================================================
 # Footer
-# =============================
+# ==================================================
 st.divider()
 st.markdown("""
 <div style="text-align:center;font-size:13px;color:#94a3b8;padding:24px;">
