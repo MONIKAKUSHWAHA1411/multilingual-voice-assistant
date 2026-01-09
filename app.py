@@ -4,6 +4,7 @@ import tempfile
 import os
 from gtts import gTTS
 from openai import OpenAI
+from st_audiorec import st_audiorec
 
 # -------------------------------------------------
 # Page Config + UI Polish
@@ -17,19 +18,19 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .block-container {
-        max-width: 800px;
-    }
+    .block-container { max-width: 820px; }
     </style>
     """,
     unsafe_allow_html=True
 )
 
 st.title("🎙 Multilingual Voice Assistant")
-st.write("Upload an audio file (English / Hindi / Hinglish)")
+st.write(
+    "Talk directly using the mic 🎙️ or upload recorded calls for analysis (English / Hindi / Hinglish)."
+)
 
 # -------------------------------------------------
-# OpenAI Client (NEW SDK)
+# OpenAI Client
 # -------------------------------------------------
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -66,12 +67,11 @@ Respond strictly in JSON with keys:
     return eval(response.choices[0].message.content)
 
 # -------------------------------------------------
-# BFSI-Compliant Response Generation
+# BFSI Response Generation
 # -------------------------------------------------
 def generate_bfsi_response(intent: str, user_text: str) -> str:
     system_prompt = """
 You are a compliant Indian banking voice assistant.
-
 Rules:
 - Do not give financial advice
 - Do not promise approvals
@@ -97,7 +97,7 @@ Generate a helpful response.
     return response.choices[0].message.content.strip()
 
 # -------------------------------------------------
-# Voice Reply (Text-to-Speech)
+# Voice Reply (TTS)
 # -------------------------------------------------
 def generate_voice_reply(text: str, lang: str):
     tts_lang = "hi" if lang == "hi" else "en"
@@ -108,34 +108,60 @@ def generate_voice_reply(text: str, lang: str):
         return audio_file.name
 
 # -------------------------------------------------
-# File Upload
+# Audio Processing (shared)
 # -------------------------------------------------
-uploaded_file = st.file_uploader(
-    "Upload audio file",
-    type=["wav", "mp3"]
-)
-
-# -------------------------------------------------
-# Main Processing Pipeline
-# -------------------------------------------------
-if uploaded_file:
+def process_audio(audio_bytes):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
-        tmp.write(uploaded_file.read())
+        tmp.write(audio_bytes)
         audio_path = tmp.name
-
-    st.info("🎧 Transcribing audio…")
 
     whisper_model = whisper.load_model("base")
     result = whisper_model.transcribe(audio_path)
     os.remove(audio_path)
 
-    user_text = result["text"]
-    language = result["language"]
+    return result["text"], result["language"]
 
+# -------------------------------------------------
+# INPUT SECTION
+# -------------------------------------------------
+st.divider()
+st.markdown("## 🎧 Input Options")
+
+# 🎙️ Mic Input
+st.markdown("### 🎙️ Speak now")
+audio_bytes = st_audiorec()
+
+# 📂 File Upload
+st.markdown("### 📂 Upload recorded call")
+uploaded_file = st.file_uploader(
+    "Upload WAV or MP3 file",
+    type=["wav", "mp3"]
+)
+
+# -------------------------------------------------
+# Determine Audio Source
+# -------------------------------------------------
+final_audio = None
+
+if audio_bytes is not None:
+    final_audio = audio_bytes
+    st.success("Voice recorded successfully")
+
+elif uploaded_file is not None:
+    final_audio = uploaded_file.read()
+    st.success("Audio file uploaded successfully")
+
+# -------------------------------------------------
+# MAIN PIPELINE
+# -------------------------------------------------
+if final_audio:
     st.divider()
+    st.info("🎧 Processing audio…")
+
+    user_text, language = process_audio(final_audio)
 
     # -----------------------------
-    # User Message
+    # User Query
     # -----------------------------
     st.markdown("### 🗣️ User Query")
     st.markdown(
@@ -146,13 +172,12 @@ if uploaded_file:
         """,
         unsafe_allow_html=True
     )
-
     st.markdown(f"🌍 **Detected Language:** `{language}`")
 
     st.divider()
 
     # -----------------------------
-    # AI Understanding
+    # Intent Understanding
     # -----------------------------
     with st.spinner("🧠 Understanding intent and context…"):
         intent_data = llm_intent_classification(user_text)
@@ -162,17 +187,15 @@ if uploaded_file:
 
     with col1:
         st.metric("Intent", intent_data["intent"])
-
     with col2:
         st.metric("Confidence", "High")
 
-    st.markdown("**Reasoning:**")
     st.info(intent_data["reasoning"])
 
     st.divider()
 
     # -----------------------------
-    # AI Response
+    # Response
     # -----------------------------
     with st.spinner("💬 Generating response…"):
         response_text = generate_bfsi_response(
@@ -196,8 +219,6 @@ if uploaded_file:
     # Voice Reply
     # -----------------------------
     voice_path = generate_voice_reply(response_text, language)
-
     st.markdown("### 🔊 Voice Reply")
     st.audio(voice_path)
-
     os.remove(voice_path)
