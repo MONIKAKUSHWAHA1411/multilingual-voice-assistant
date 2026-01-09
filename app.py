@@ -258,7 +258,8 @@ st.markdown(
         text-align:center;
         font-size:13px;
         color:#94a3b8;
-        padding:20px 0;
+        padding:24px 0;
+        line-height:1.6;
     ">
         Made by 
         <a href="https://www.linkedin.com/in/monika-kushwaha-52443735/"
@@ -266,7 +267,12 @@ st.markdown(
            style="color:#60a5fa; text-decoration:none; font-weight:500;">
            Monika Kushwaha
         </a>
+        <br/>
+        <span style="font-size:12px; color:#64748b;">
+            Built for BFSI Voice AI
+        </span>
     </div>
     """,
     unsafe_allow_html=True
 )
+
