@@ -68,16 +68,38 @@ client = Groq(api_key=GROQ_API_KEY)
 # Voice upload
 # -----------------------------
 st.subheader("🎙 Upload your voice")
+
 audio_file = st.file_uploader(
     "Upload an audio file (WAV or MP3)",
     type=["wav", "mp3"]
 )
 
+# -----------------------------
+# Speech to text (English + Hindi fallback)
+# -----------------------------
 def speech_to_text(audio_path):
     recognizer = sr.Recognizer()
     with sr.AudioFile(audio_path) as source:
         audio = recognizer.record(source)
-    return recognizer.recognize_google(audio)
+
+    try:
+        return recognizer.recognize_google(audio, language="en-IN")
+    except:
+        try:
+            return recognizer.recognize_google(audio, language="hi-IN")
+        except:
+            return ""
+
+# -----------------------------
+# Simple language detection
+# -----------------------------
+def detect_language(text):
+    if any(char in text for char in "अआइईउऊएऐओऔ"):
+        return "Hindi"
+    elif any(word in text.lower() for word in ["hai", "nahi", "kyun", "kya", "ka", "ki"]):
+        return "Hinglish"
+    else:
+        return "English"
 
 # -----------------------------
 # Process audio
@@ -92,33 +114,41 @@ if audio_file:
 
             user_text = speech_to_text(audio_path)
 
-            st.success("Speech recognized")
-            st.markdown("**You said:**")
-            st.write(user_text)
+            if not user_text:
+                st.error("Sorry, could not understand the audio.")
+            else:
+                lang = detect_language(user_text)
 
-            completion = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "You are a professional AI assistant for BFSI service operations. "
-                            "Respond clearly, politely, and in a compliant tone. "
-                            "If the user uses a non-English language, reply in the same language."
-                        )
-                    },
-                    {
-                        "role": "user",
-                        "content": user_text
-                    }
-                ],
-                temperature=0.3
-            )
+                st.success("Speech recognized")
+                st.markdown("**You said:**")
+                st.write(user_text)
+                st.info(f"Detected language: {lang}")
 
-            answer = completion.choices[0].message.content
+                completion = client.chat.completions.create(
+                    model="llama-3.1-8b-instant",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a multilingual AI assistant for BFSI service operations. "
+                                "The user may speak in English, Hindi, or Hinglish. "
+                                "Always reply in the SAME language style used by the user. "
+                                "If the user mixes languages, reply in Hinglish. "
+                                "Be clear, polite, and compliant."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": user_text
+                        }
+                    ],
+                    temperature=0.3
+                )
 
-            st.subheader("🤖 Assistant Response")
-            st.write(answer)
+                answer = completion.choices[0].message.content
+
+                st.subheader("🤖 Assistant Response")
+                st.write(answer)
 
         except Exception as e:
             st.error(f"Error processing audio: {e}")
