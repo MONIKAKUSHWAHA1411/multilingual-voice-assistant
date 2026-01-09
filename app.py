@@ -1,9 +1,9 @@
 import streamlit as st
 import os
-import google.generativeai as genai
 import speech_recognition as sr
 from tempfile import NamedTemporaryFile
 from pydub import AudioSegment
+from groq import Groq
 
 # -----------------------------
 # Page config
@@ -15,19 +15,16 @@ st.set_page_config(
 )
 
 # -----------------------------
-# Custom CSS (Oriserve blue vibe)
+# Oriserve-style blue UI
 # -----------------------------
 st.markdown("""
 <style>
 .stApp {
-    background: linear-gradient(135deg, #0f172a, #1e3a8a);
+    background: linear-gradient(135deg, #0b1f44, #1e3a8a);
     color: white;
 }
-h1, h2, h3, h4 {
+h1, h2, h3 {
     color: #e0f2fe;
-}
-.stFileUploader label {
-    color: #e0f2fe !important;
 }
 .stButton button {
     background-color: #2563eb;
@@ -57,20 +54,15 @@ st.title("🌍 Multilingual AI Assistant")
 st.caption("AI-powered assistant for multilingual service operations (BFSI-ready)")
 
 # -----------------------------
-# API Key
+# Groq API Key
 # -----------------------------
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if not GOOGLE_API_KEY:
-    st.error("Google API key not found. Please add it in Streamlit Secrets.")
+if not GROQ_API_KEY:
+    st.error("Groq API key not found. Please add it in Streamlit Secrets.")
     st.stop()
 
-genai.configure(api_key=GOOGLE_API_KEY)
-
-# -----------------------------
-# ✅ WORKING Gemini model
-# -----------------------------
-model = genai.GenerativeModel("models/gemini-pro")
+client = Groq(api_key=GROQ_API_KEY)
 
 # -----------------------------
 # Voice upload
@@ -104,19 +96,29 @@ if audio_file:
             st.markdown("**You said:**")
             st.write(user_text)
 
-            response = model.generate_content(
-                f"""
-You are a professional AI voice assistant designed for BFSI service operations.
-Respond clearly, politely, and in a compliant tone.
-If the user speaks in a non-English language, reply in the same language.
-
-User query:
-{user_text}
-"""
+            completion = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a professional AI assistant for BFSI service operations. "
+                            "Respond clearly, politely, and in a compliant tone. "
+                            "If the user uses a non-English language, reply in the same language."
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": user_text
+                    }
+                ],
+                temperature=0.3
             )
 
+            answer = completion.choices[0].message.content
+
             st.subheader("🤖 Assistant Response")
-            st.write(response.text)
+            st.write(answer)
 
         except Exception as e:
             st.error(f"Error processing audio: {e}")
@@ -126,7 +128,7 @@ User query:
 # -----------------------------
 st.markdown("""
 <div class="footer">
-    Built with Streamlit + Google Gemini<br>
+    Built with Streamlit + Groq (LLaMA 3)<br>
     Made by <a href="https://www.linkedin.com/in/monika-kushwaha-52443735/" target="_blank">
     Monika Kushwaha
     </a>
