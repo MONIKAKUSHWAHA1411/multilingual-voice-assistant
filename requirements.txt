@@ -1,7 +1,4 @@
 streamlit
 google-generativeai
-python-dotenv
 speechrecognition
-gtts
 pydub
-
