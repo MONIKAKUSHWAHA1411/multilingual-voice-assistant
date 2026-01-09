@@ -1,16 +1,7 @@
-streamlit>=1.30.0
-
-# Speech-to-text (audio upload only)
-openai-whisper
-
-# Language detection
-langdetect
-
-# Text-to-speech (voice reply)
-gTTS
-
-# Audio handling
+streamlit
+google-generativeai
+python-dotenv
+speechrecognition
+gtts
 pydub
 
-# NLP utilities
-numpy
