@@ -14,8 +14,47 @@ st.set_page_config(
     layout="centered"
 )
 
+# -----------------------------
+# Custom CSS (Oriserve blue vibe)
+# -----------------------------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(135deg, #0f172a, #1e3a8a);
+    color: white;
+}
+h1, h2, h3, h4 {
+    color: #e0f2fe;
+}
+.stFileUploader label {
+    color: #e0f2fe !important;
+}
+.stButton button {
+    background-color: #2563eb;
+    color: white;
+    border-radius: 8px;
+}
+.stButton button:hover {
+    background-color: #1d4ed8;
+}
+.footer {
+    text-align: center;
+    margin-top: 40px;
+    color: #c7d2fe;
+}
+.footer a {
+    color: #93c5fd;
+    text-decoration: none;
+    font-weight: 600;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -----------------------------
+# Header
+# -----------------------------
 st.title("🌍 Multilingual AI Assistant")
-st.caption("AI-powered assistant for multilingual service operations")
+st.caption("AI-powered assistant for multilingual service operations (BFSI-ready)")
 
 # -----------------------------
 # API Key
@@ -23,23 +62,22 @@ st.caption("AI-powered assistant for multilingual service operations")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
-    st.error("Google API key not found. Add it in Streamlit Secrets.")
+    st.error("Google API key not found. Please add it in Streamlit Secrets.")
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # -----------------------------
-# Gemini model (STABLE)
+# ✅ WORKING Gemini model
 # -----------------------------
-model = genai.GenerativeModel("gemini-1.0-pro")
+model = genai.GenerativeModel("models/gemini-pro")
 
 # -----------------------------
-# Upload audio
+# Voice upload
 # -----------------------------
 st.subheader("🎙 Upload your voice")
-
 audio_file = st.file_uploader(
-    "Upload an audio file (wav or mp3)",
+    "Upload an audio file (WAV or MP3)",
     type=["wav", "mp3"]
 )
 
@@ -68,9 +106,9 @@ if audio_file:
 
             response = model.generate_content(
                 f"""
-You are a helpful AI assistant for service operations.
-Answer clearly and politely.
-If the user speaks in a non-English language, respond in the same language.
+You are a professional AI voice assistant designed for BFSI service operations.
+Respond clearly, politely, and in a compliant tone.
+If the user speaks in a non-English language, reply in the same language.
 
 User query:
 {user_text}
@@ -86,4 +124,11 @@ User query:
 # -----------------------------
 # Footer
 # -----------------------------
-st.caption("Built with Streamlit + Google Gemini | Voice-first AI assistant")
+st.markdown("""
+<div class="footer">
+    Built with Streamlit + Google Gemini<br>
+    Made by <a href="https://www.linkedin.com/in/monika-kushwaha-52443735/" target="_blank">
+    Monika Kushwaha
+    </a>
+</div>
+""", unsafe_allow_html=True)
