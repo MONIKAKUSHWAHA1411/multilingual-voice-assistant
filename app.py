@@ -1,56 +1,54 @@
 import streamlit as st
-import whisper
 import tempfile
-import os
 from langdetect import detect
 from gtts import gTTS
 from openai import OpenAI
+import os
 
 # -----------------------------
-# Page Config
+# Page config
 # -----------------------------
 st.set_page_config(
     page_title="BFSI Multilingual Voice Assistant",
-    layout="centered",
+    layout="centered"
 )
 
 # -----------------------------
-# Custom Oriserve-style CSS
+# Oriserve-style CSS
 # -----------------------------
 st.markdown("""
 <style>
-.main {
+body {
     background-color:#0b1220;
-    color:#e5e7eb;
 }
 .header {
     background: linear-gradient(90deg, #2563eb, #3b82f6);
-    padding:24px;
+    padding:22px;
     border-radius:14px;
     text-align:center;
-    margin-bottom:30px;
+    margin-bottom:25px;
 }
 .header h1 {
-    font-size:28px;
+    font-size:26px;
     color:white;
     margin-bottom:6px;
 }
 .header p {
     color:#dbeafe;
-    font-size:14px;
+    font-size:13px;
 }
 .section {
-    margin-top:30px;
+    margin-top:26px;
+}
+.intent-box {
+    background:#020617;
+    padding:12px;
+    border-radius:10px;
+    font-size:14px;
 }
 .small {
     font-size:13px;
     color:#94a3b8;
-}
-.intent-box {
-    background:#020617;
-    padding:14px;
-    border-radius:10px;
-    margin-top:10px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -66,120 +64,117 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------
-# OpenAI Client
+# OpenAI client
 # -----------------------------
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # -----------------------------
-# Load Whisper Model
-# -----------------------------
-@st.cache_resource
-def load_whisper():
-    return whisper.load_model("base")
-
-model = load_whisper()
-
-# -----------------------------
 # BFSI Intent Taxonomy (20+)
 # -----------------------------
-BFSI_INTENTS = {
-    "Account Balance Inquiry": ["balance", "kitna paisa", "remaining"],
-    "Mini Statement": ["last transactions", "mini statement"],
-    "Card Block": ["block card", "card lost", "freeze card"],
-    "Card Replacement": ["new card", "replace card"],
-    "PIN Generation / Reset": ["reset pin", "forgot pin"],
+INTENTS = {
+    "Account Balance Inquiry": ["balance", "kitna", "remaining"],
+    "Mini Statement": ["mini statement", "last transactions"],
+    "Card Block": ["block card", "lost card"],
+    "Card Replacement": ["replace card", "new card"],
+    "PIN Reset": ["forgot pin", "reset pin"],
     "Loan Eligibility": ["loan eligibility", "can I get loan"],
-    "Loan EMI Inquiry": ["emi", "monthly installment"],
-    "Loan Foreclosure": ["close loan", "foreclosure"],
-    "Interest Rate Inquiry": ["interest rate", "roi"],
-    "Account Type Conversion": ["salary account", "convert account"],
-    "KYC Update": ["update kyc", "kyc pending"],
-    "Debit Card Charges": ["card charges", "annual fee"],
-    "Credit Card Limit": ["credit limit", "increase limit"],
-    "Transaction Failure": ["failed transaction", "money deducted"],
-    "UPI Issue": ["upi not working", "upi failed"],
+    "Loan EMI": ["emi", "monthly installment"],
+    "Loan Foreclosure": ["close loan"],
+    "Interest Rates": ["interest rate", "roi"],
+    "Account Conversion": ["salary account", "convert account"],
+    "KYC Update": ["kyc update"],
+    "Debit Card Charges": ["debit card charges"],
+    "Credit Limit": ["credit limit"],
+    "Transaction Failure": ["failed transaction"],
+    "UPI Issue": ["upi issue"],
     "Cheque Status": ["cheque status"],
-    "Branch Information": ["nearest branch"],
+    "Branch Info": ["nearest branch"],
     "Customer Support": ["talk to agent"],
     "Account Closure": ["close account"],
     "Nominee Update": ["add nominee"],
-    "Address Update": ["change address"],
+    "Address Update": ["change address"]
 }
 
 def detect_intent(text):
-    text = text.lower()
-    for intent, keywords in BFSI_INTENTS.items():
-        if any(k in text for k in keywords):
+    t = text.lower()
+    for intent, keys in INTENTS.items():
+        if any(k in t for k in keys):
             return intent
     return "General Banking Query"
 
 # -----------------------------
-# LLM Response Generator
+# Speech to Text (OpenAI)
 # -----------------------------
-def llm_reply(text, intent, lang):
-    prompt = f"""
-You are a BFSI voice assistant.
-User language: {lang}
-Detected intent: {intent}
+def transcribe(audio_path):
+    with open(audio_path, "rb") as audio:
+        transcript = client.audio.transcriptions.create(
+            file=audio,
+            model="gpt-4o-transcribe"
+        )
+    return transcript.text
 
-Answer politely, clearly, and in a banking-compliant tone.
+# -----------------------------
+# LLM Reply
+# -----------------------------
+def generate_reply(text, intent, lang):
+    prompt = f"""
+You are a BFSI virtual assistant.
+Detected intent: {intent}
+User language: {lang}
+
+Reply in a polite, compliant banking tone.
+Avoid giving sensitive personal data.
 """
     res = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role":"system","content":prompt},
-            {"role":"user","content":text}
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": text}
         ],
         temperature=0.2
     )
     return res.choices[0].message.content
 
 # -----------------------------
-# Text-to-Speech
+# Text to Speech
 # -----------------------------
 def speak(text, lang):
-    tts = gTTS(text=text, lang="hi" if lang=="hi" else "en")
+    tts = gTTS(text=text, lang="hi" if lang == "hi" else "en")
     path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
     tts.save(path)
     return path
 
 # -----------------------------
-# Input Options
+# Input options
 # -----------------------------
 st.markdown("## 🎧 Input Options")
 
-audio_input = st.audio_input("🎙️ Speak now")
+mic_audio = st.audio_input("🎙️ Speak now")
 
 uploaded_file = st.file_uploader(
     "📁 Upload recorded call (WAV / MP3)",
     type=["wav", "mp3"]
 )
 
-audio_file = audio_input or uploaded_file
+audio = mic_audio or uploaded_file
 
 # -----------------------------
 # Processing
 # -----------------------------
-if audio_file:
-    with st.spinner("Transcribing audio..."):
+if audio:
+    with st.spinner("Processing voice..."):
         with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(audio_file.read())
+            tmp.write(audio.read())
             audio_path = tmp.name
 
-        result = model.transcribe(audio_path)
-        text = result["text"]
+        user_text = transcribe(audio_path)
+        lang = detect(user_text)
+        intent = detect_intent(user_text)
+        reply = generate_reply(user_text, intent, lang)
+        voice_reply = speak(reply, lang)
 
-        lang = detect(text)
-        intent = detect_intent(text)
-
-        reply = llm_reply(text, intent, lang)
-        voice_path = speak(reply, lang)
-
-    # -----------------------------
-    # Output
-    # -----------------------------
     st.markdown("### 📝 Transcription")
-    st.write(text)
+    st.write(user_text)
 
     st.markdown("### 🌍 Detected Language")
     st.write(lang)
@@ -191,7 +186,7 @@ if audio_file:
     st.write(reply)
 
     st.markdown("### 🔊 Voice Reply")
-    st.audio(voice_path)
+    st.audio(voice_reply)
 
 # -----------------------------
 # Footer
