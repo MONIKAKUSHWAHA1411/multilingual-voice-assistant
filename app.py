@@ -1,6 +1,9 @@
 import streamlit as st
 import os
 import google.generativeai as genai
+import speech_recognition as sr
+from tempfile import NamedTemporaryFile
+from pydub import AudioSegment
 
 # -----------------------------
 # Page config
@@ -11,88 +14,79 @@ st.set_page_config(
     layout="centered"
 )
 
-# -----------------------------
-# App title
-# -----------------------------
 st.title("🌍 Multilingual AI Assistant")
-st.caption("AI-powered assistant designed for multilingual service operations")
+st.caption("AI-powered assistant for multilingual service operations")
 
 # -----------------------------
-# Load API Key
+# API Key
 # -----------------------------
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
-    st.error("Google API key not found. Please add it in Streamlit Secrets.")
+    st.error("Google API key not found. Add it in Streamlit Secrets.")
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # -----------------------------
-# Model setup (Free & Stable)
+# Gemini model (WORKING)
 # -----------------------------
-MODEL_NAME = "gemini-1.5-flash"
-model = genai.GenerativeModel(MODEL_NAME)
+model = genai.GenerativeModel("gemini-1.5-flash-latest")
 
 # -----------------------------
-# Session state
+# Audio upload
 # -----------------------------
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+st.subheader("🎙 Upload your voice")
 
-# -----------------------------
-# Input section
-# -----------------------------
-st.subheader("💬 Ask something")
-
-user_input = st.text_area(
-    "Enter your message (any language)",
-    placeholder="Example: Explain AI automation in simple terms",
-    height=120
+audio_file = st.file_uploader(
+    "Upload an audio file (wav/mp3)",
+    type=["wav", "mp3"]
 )
 
+def speech_to_text(audio_path):
+    recognizer = sr.Recognizer()
+    with sr.AudioFile(audio_path) as source:
+        audio = recognizer.record(source)
+    return recognizer.recognize_google(audio)
+
 # -----------------------------
-# Generate response
+# Process audio
 # -----------------------------
-if st.button("Generate Response"):
-    if not user_input.strip():
-        st.warning("Please enter a message.")
-    else:
-        with st.spinner("Thinking..."):
-            try:
-                response = model.generate_content(
-                    f"""
-You are a helpful AI assistant designed for service operations.
-Respond clearly, politely, and concisely.
-If the input is not in English, respond in the same language.
+if audio_file:
+    with st.spinner("Processing audio..."):
+        try:
+            # Save uploaded file
+            with NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
+                audio = AudioSegment.from_file(audio_file)
+                audio.export(tmp.name, format="wav")
+                audio_path = tmp.name
+
+            # Speech to text
+            user_text = speech_to_text(audio_path)
+
+            st.success("Speech recognized")
+            st.write("**You said:**")
+            st.write(user_text)
+
+            # Gemini response
+            response = model.generate_content(
+                f"""
+You are a helpful AI assistant for service operations.
+Respond clearly and politely.
+If the user speaks in a non-English language, reply in the same language.
 
 User query:
-{user_input}
+{user_text}
 """
-                )
+            )
 
-                answer = response.text
+            st.subheader("🤖 Assistant Response")
+            st.write(response.text)
 
-                st.session_state.chat_history.append(
-                    {"user": user_input, "assistant": answer}
-                )
-
-            except Exception as e:
-                st.error(f"Something went wrong: {e}")
-
-# -----------------------------
-# Chat history
-# -----------------------------
-if st.session_state.chat_history:
-    st.subheader("🗂 Conversation")
-    for chat in reversed(st.session_state.chat_history):
-        st.markdown("**You:**")
-        st.write(chat["user"])
-        st.markdown("**Assistant:**")
-        st.write(chat["assistant"])
-        st.divider()
+        except Exception as e:
+            st.error(f"Error processing audio: {e}")
 
 # -----------------------------
 # Footer
 # -----------------------------
-st.caption("Built using Streamlit + Google Gemini | Scalable AI assistant demo")
+st.caption("Built with Streamlit + Google Gemini | Voice-first AI assistant")
