@@ -29,17 +29,17 @@ if not GOOGLE_API_KEY:
 genai.configure(api_key=GOOGLE_API_KEY)
 
 # -----------------------------
-# Gemini model (WORKING)
+# Gemini model (STABLE)
 # -----------------------------
-model = genai.GenerativeModel("gemini-1.5-flash-latest")
+model = genai.GenerativeModel("gemini-1.0-pro")
 
 # -----------------------------
-# Audio upload
+# Upload audio
 # -----------------------------
 st.subheader("🎙 Upload your voice")
 
 audio_file = st.file_uploader(
-    "Upload an audio file (wav/mp3)",
+    "Upload an audio file (wav or mp3)",
     type=["wav", "mp3"]
 )
 
@@ -55,25 +55,22 @@ def speech_to_text(audio_path):
 if audio_file:
     with st.spinner("Processing audio..."):
         try:
-            # Save uploaded file
             with NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
                 audio = AudioSegment.from_file(audio_file)
                 audio.export(tmp.name, format="wav")
                 audio_path = tmp.name
 
-            # Speech to text
             user_text = speech_to_text(audio_path)
 
             st.success("Speech recognized")
-            st.write("**You said:**")
+            st.markdown("**You said:**")
             st.write(user_text)
 
-            # Gemini response
             response = model.generate_content(
                 f"""
 You are a helpful AI assistant for service operations.
-Respond clearly and politely.
-If the user speaks in a non-English language, reply in the same language.
+Answer clearly and politely.
+If the user speaks in a non-English language, respond in the same language.
 
 User query:
 {user_text}
