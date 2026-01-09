@@ -1,7 +1,7 @@
-streamlit
-openai
-openai-whisper
-torch
-numpy
-gTTS
+
 streamlit-audiorec
+streamlit
+openai>=1.0.0
+whisper
+gtts
+langdetect
