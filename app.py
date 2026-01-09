@@ -3,11 +3,11 @@ import whisper
 import tempfile
 import os
 from gtts import gTTS
-import openai
+from openai import OpenAI
 
-# -----------------------------
-# CONFIG
-# -----------------------------
+# -------------------------------------------------
+# Page Config
+# -------------------------------------------------
 st.set_page_config(
     page_title="Multilingual Voice Assistant",
     page_icon="🎙️",
@@ -17,19 +17,19 @@ st.set_page_config(
 st.title("🎙 Multilingual Voice Assistant")
 st.write("Upload an audio file (English / Hindi / Hinglish)")
 
-# -----------------------------
-# OpenAI API Key (Streamlit Secrets)
-# -----------------------------
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+# -------------------------------------------------
+# OpenAI Client (NEW API)
+# -------------------------------------------------
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# -----------------------------
-# LLM-Based Intent Detection
-# -----------------------------
+# -------------------------------------------------
+# LLM-Based Intent Classification
+# -------------------------------------------------
 def llm_intent_classification(user_text: str) -> dict:
     system_prompt = """
-You are an enterprise banking voice assistant.
-Classify the user's query into one of the following intents:
+You are an enterprise Indian banking voice assistant.
 
+Classify the user's query into ONE of the following intents:
 1. Account Balance
 2. Transaction History
 3. Card Block / Lost Card
@@ -38,37 +38,38 @@ Classify the user's query into one of the following intents:
 6. Fees & Charges
 7. General Banking Query
 
-Return a JSON with:
+Respond strictly in JSON with keys:
 - intent
-- reasoning (short explanation)
+- reasoning
 """
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
+        temperature=0.2,
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_text}
-        ],
-        temperature=0.2
+        ]
     )
 
     return eval(response.choices[0].message.content)
 
-# -----------------------------
+# -------------------------------------------------
 # BFSI-Compliant Response Generation
-# -----------------------------
+# -------------------------------------------------
 def generate_bfsi_response(intent: str, user_text: str) -> str:
     system_prompt = """
 You are a compliant Indian banking voice assistant.
+
 Rules:
-- Do NOT give financial advice
-- Do NOT promise approvals
-- Keep tone professional, clear, human
-- Short response
+- Do not give financial advice
+- Do not promise approvals
+- Keep response short, clear, professional
 """
 
-    response = openai.ChatCompletion.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
+        temperature=0.4,
         messages=[
             {"role": "system", "content": system_prompt},
             {
@@ -79,32 +80,33 @@ Detected intent: {intent}
 Generate a helpful response.
 """
             }
-        ],
-        temperature=0.4
+        ]
     )
 
     return response.choices[0].message.content.strip()
 
-# -----------------------------
-# Voice Reply (TTS)
-# -----------------------------
-def generate_voice(text: str, lang: str):
-    tts = gTTS(text=text, lang="hi" if lang == "hi" else "en")
+# -------------------------------------------------
+# Voice Reply (Text-to-Speech)
+# -------------------------------------------------
+def generate_voice_reply(text: str, lang: str):
+    tts_lang = "hi" if lang == "hi" else "en"
+    tts = gTTS(text=text, lang=tts_lang)
+
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as audio_file:
         tts.save(audio_file.name)
         return audio_file.name
 
-# -----------------------------
+# -------------------------------------------------
 # File Upload
-# -----------------------------
+# -------------------------------------------------
 uploaded_file = st.file_uploader(
     "Upload audio file",
     type=["wav", "mp3"]
 )
 
-# -----------------------------
-# Processing
-# -----------------------------
+# -------------------------------------------------
+# Processing Pipeline
+# -------------------------------------------------
 if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(uploaded_file.read())
@@ -112,8 +114,8 @@ if uploaded_file:
 
     st.info("Transcribing audio…")
 
-    model = whisper.load_model("base")
-    result = model.transcribe(audio_path)
+    whisper_model = whisper.load_model("base")
+    result = whisper_model.transcribe(audio_path)
     os.remove(audio_path)
 
     user_text = result["text"]
@@ -135,12 +137,15 @@ if uploaded_file:
     st.write(intent_data["reasoning"])
 
     with st.spinner("Generating response…"):
-        response_text = generate_bfsi_response(intent_data["intent"], user_text)
+        response_text = generate_bfsi_response(
+            intent_data["intent"],
+            user_text
+        )
 
     st.subheader("💬 Assistant Response")
     st.write(response_text)
 
-    voice_path = generate_voice(response_text, language)
+    voice_path = generate_voice_reply(response_text, language)
 
     st.subheader("🔊 Voice Reply")
     st.audio(voice_path)
