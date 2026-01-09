@@ -1,132 +1,143 @@
-BFSI Multilingual Voice Assistant
+# 🌍 Multilingual AI Assistant (Voice-first, BFSI-ready)
 
-Purpose-built Voice AI for Banking & Financial Services
+A **voice-first multilingual AI assistant** built to demonstrate how modern LLMs can power **BFSI service operations** like collections, renewals, and customer support — with strong support for **English, Hindi, and Hinglish**.
 
-🔍 Overview
+This project is designed as a **production-safe POC** aligned with Oriserve / ORI-style voice bots.
 
-BFSI Multilingual Voice Assistant is a production-style AI prototype designed for banking and financial services use cases such as customer support analysis, intent detection, and multilingual call understanding.
+---
 
-The system accepts uploaded call recordings or typed customer queries, automatically transcribes them, detects the language, classifies the banking intent, and returns a structured response — all in a clean, compliant, enterprise-ready UI.
+## ✨ What this project shows
 
-This project is built to mirror real-world BFSI workflows, where banks process recorded customer calls at scale, rather than interacting live on behalf of customers.
+* 🎙 **Voice-first UX** (audio upload → speech → AI response)
+* 🌐 **Multilingual handling**: English, Hindi, Hinglish
+* 🧠 **Fast LLM inference** using Groq (LLaMA 3)
+* 🏦 **BFSI-compliant tone** baked into prompts
+* ⚡ **Low-latency responses** suitable for real-time voice bots
+* 🎨 **Enterprise blue UI** inspired by Oriserve branding
 
-🎯 Why This Project Exists
+---
 
-Banks and NBFCs handle:
+## 🧠 Architecture
 
-Thousands of multilingual customer calls daily
-
-Regulatory constraints (RBI, GDPR, HIPAA)
-
-Need for accurate intent classification over free-flowing speech
-
-Heavy post-call analytics and audit requirements
-
-This project demonstrates how GenAI + Voice AI can solve these challenges without replacing human agents, but by augmenting operations, QA, and analytics.
-
-🧠 Key Capabilities
-🎧 Audio Upload (Primary BFSI Flow)
-
-Upload WAV / MP3 call recordings
-
-Designed for post-call processing
-
-Handles English, Hindi, and Hinglish seamlessly
-
-✍️ Text Input (Fallback / QA Mode)
-
-Paste customer queries directly
-
-Useful for QA teams, demos, and testing edge cases
-
-🗣️ Multilingual Transcription
-
-Automatic speech-to-text
-
-Robust for Indian accents and code-mixed language
-
-🌐 Language Detection
-
-Identifies spoken language automatically
-
-Enables region-specific analytics
-
-🧭 BFSI Intent Classification (20+ intents)
-
-Examples:
-
-Balance Inquiry
-
-Account Type Check
-
-Card Block / Unblock
-
-Loan Status
-
-EMI / Repayment
-
-KYC / Document Update
-
-Branch / ATM Info
-
-Fraud Reporting
-
-Interest Rate Query
-
-Statement Request
-(and more)
-
-🧩 Modular Architecture
-
-Easy to extend with:
-
-CRM integrations
-
-Ticketing systems
-
-Call quality scoring
-
-Sentiment analysis
-
-Compliance checks
-
-🏗️ Architecture (High Level)
-Audio / Text Input
+```
+User Voice (WAV / MP3)
         ↓
-Speech-to-Text
+Speech Recognition (Google STT)
         ↓
-Language Detection
+Language Detection (English / Hindi / Hinglish)
         ↓
-BFSI Intent Classification
+Groq LLM (LLaMA 3.1)
         ↓
-Structured Output for Ops / QA / Analytics
+Text Response (same language style)
+```
 
-🛠️ Tech Stack
+---
 
-Frontend: Streamlit (custom dark BFSI UI)
+## 🛠 Tech Stack
 
-Speech Processing: Whisper-based transcription
+* **Frontend**: Streamlit
+* **Speech-to-Text**: SpeechRecognition (Google backend)
+* **LLM**: Groq (LLaMA 3.1 – 8B Instant)
+* **Audio Processing**: pydub
+* **Deployment**: Streamlit Cloud
 
-Language Detection: langdetect
+---
 
-Intent Classification: LLM-based zero-shot reasoning
+## 🌐 Language Support
 
-Deployment: Streamlit Community Cloud
+The assistant automatically adapts to how the user speaks:
 
-Design Philosophy: Compliance-first, enterprise-ready
+| User Speech | Assistant Response |
+| ----------- | ------------------ |
+| English     | English            |
+| Hindi       | Hindi              |
+| Hinglish    | Hinglish           |
 
-🧪 Why This Is Not “Just Another Demo”
+This mirrors **real Indian BFSI customer conversations**, especially in collections and support calls.
 
-This project intentionally:
+---
 
-Avoids chatbot gimmicks
+## 🚀 How to Run Locally
 
-Focuses on bank-realistic workflows
+### 1. Clone the repo
 
-Prioritizes upload-based call analysis
+```bash
+git clone <your-repo-url>
+cd multilingual-ai-assistant
+```
 
-Handles multilingual Indian banking scenarios
+### 2. Install dependencies
 
-Separates customer interaction from bank processing
+```bash
+pip install -r requirements.txt
+```
 
-This mirrors how real BFSI AI systems are actually deployed.
+### 3. Set environment variable
+
+```bash
+export GROQ_API_KEY="your_groq_api_key"
+```
+
+(or add it in Streamlit Secrets)
+
+### 4. Run the app
+
+```bash
+streamlit run app.py
+```
+
+---
+
+## ☁️ Deploy on Streamlit Cloud
+
+1. Push code to GitHub
+2. Create a Streamlit Cloud app
+3. Add secret:
+
+```toml
+GROQ_API_KEY="your_groq_api_key"
+```
+
+4. Reboot app
+
+---
+
+## 🎯 Why Groq + LLaMA 3?
+
+* Extremely **low latency** (ideal for voice bots)
+* **Stable SDK** on Streamlit Cloud
+* Open-weight LLMs → vendor flexibility
+* Great multilingual performance
+
+For POCs and demos, **reliability > experimental features**.
+
+---
+
+## 🏦 BFSI Use Cases
+
+* Loan collections voice assistant
+* Card blocking / account queries
+* Renewal & follow-up calls
+* Multilingual customer support
+
+---
+
+## 🔮 Possible Extensions
+
+* 🔊 Text-to-Speech (Hindi + English)
+* 🎯 Intent classification (Collection / Renewal / Support)
+* 📊 Confidence scoring
+* 🧾 Conversation logging for audits
+
+---
+
+## 👩‍💻 Author
+
+**Made by Monika Kushwaha**
+🔗 LinkedIn: [https://www.linkedin.com/in/monika-kushwaha-52443735/](https://www.linkedin.com/in/monika-kushwaha-52443735/)
+
+---
+
+## 📌 Note
+
+This project is a **functional POC**, not a production system. It is intentionally designed to demonstrate **architecture, UX decisions, and AI integration strategy** relevant to BFSI voice automation platforms like Oriserve / ORI.
