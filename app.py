@@ -6,7 +6,7 @@ from gtts import gTTS
 from openai import OpenAI
 
 # -------------------------------------------------
-# Page Config
+# Page Config + UI Polish
 # -------------------------------------------------
 st.set_page_config(
     page_title="Multilingual Voice Assistant",
@@ -14,11 +14,22 @@ st.set_page_config(
     layout="centered"
 )
 
+st.markdown(
+    """
+    <style>
+    .block-container {
+        max-width: 800px;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.title("🎙 Multilingual Voice Assistant")
 st.write("Upload an audio file (English / Hindi / Hinglish)")
 
 # -------------------------------------------------
-# OpenAI Client (NEW API)
+# OpenAI Client (NEW SDK)
 # -------------------------------------------------
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
@@ -105,14 +116,14 @@ uploaded_file = st.file_uploader(
 )
 
 # -------------------------------------------------
-# Processing Pipeline
+# Main Processing Pipeline
 # -------------------------------------------------
 if uploaded_file:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
         tmp.write(uploaded_file.read())
         audio_path = tmp.name
 
-    st.info("Transcribing audio…")
+    st.info("🎧 Transcribing audio…")
 
     whisper_model = whisper.load_model("base")
     result = whisper_model.transcribe(audio_path)
@@ -121,33 +132,72 @@ if uploaded_file:
     user_text = result["text"]
     language = result["language"]
 
-    st.subheader("📝 Transcription")
-    st.write(user_text)
+    st.divider()
 
-    st.subheader("🌍 Detected Language")
-    st.write(language)
+    # -----------------------------
+    # User Message
+    # -----------------------------
+    st.markdown("### 🗣️ User Query")
+    st.markdown(
+        f"""
+        <div style="background:#1f2937;padding:16px;border-radius:12px;">
+        {user_text}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    with st.spinner("Understanding intent…"):
+    st.markdown(f"🌍 **Detected Language:** `{language}`")
+
+    st.divider()
+
+    # -----------------------------
+    # AI Understanding
+    # -----------------------------
+    with st.spinner("🧠 Understanding intent and context…"):
         intent_data = llm_intent_classification(user_text)
 
-    st.subheader("🧠 Detected Intent")
-    st.write(intent_data["intent"])
+    st.markdown("### 🧠 AI Understanding")
+    col1, col2 = st.columns(2)
 
-    st.subheader("🔍 Reasoning")
-    st.write(intent_data["reasoning"])
+    with col1:
+        st.metric("Intent", intent_data["intent"])
 
-    with st.spinner("Generating response…"):
+    with col2:
+        st.metric("Confidence", "High")
+
+    st.markdown("**Reasoning:**")
+    st.info(intent_data["reasoning"])
+
+    st.divider()
+
+    # -----------------------------
+    # AI Response
+    # -----------------------------
+    with st.spinner("💬 Generating response…"):
         response_text = generate_bfsi_response(
             intent_data["intent"],
             user_text
         )
 
-    st.subheader("💬 Assistant Response")
-    st.write(response_text)
+    st.markdown("### 🤖 Assistant Response")
+    st.markdown(
+        f"""
+        <div style="background:#111827;padding:18px;border-radius:14px;line-height:1.6;">
+        {response_text}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
+    st.divider()
+
+    # -----------------------------
+    # Voice Reply
+    # -----------------------------
     voice_path = generate_voice_reply(response_text, language)
 
-    st.subheader("🔊 Voice Reply")
+    st.markdown("### 🔊 Voice Reply")
     st.audio(voice_path)
 
     os.remove(voice_path)
