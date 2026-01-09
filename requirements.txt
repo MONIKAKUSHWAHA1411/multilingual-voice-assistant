@@ -1,4 +1,6 @@
+
 streamlit
 openai>=1.0.0
+google-generativeai
 gtts
 langdetect
