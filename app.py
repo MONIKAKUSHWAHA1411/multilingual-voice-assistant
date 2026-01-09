@@ -1,21 +1,30 @@
 import streamlit as st
 import tempfile
+import time
 from langdetect import detect
 from gtts import gTTS
 from openai import OpenAI
-import os
 
-# -----------------------------
-# Page config
-# -----------------------------
+# =============================
+# Page Config
+# =============================
 st.set_page_config(
     page_title="BFSI Multilingual Voice Assistant",
     layout="centered"
 )
 
-# -----------------------------
+# =============================
+# Session Guards (IMPORTANT)
+# =============================
+if "last_call_time" not in st.session_state:
+    st.session_state.last_call_time = 0
+
+if "cached_result" not in st.session_state:
+    st.session_state.cached_result = None
+
+# =============================
 # Oriserve-style CSS
-# -----------------------------
+# =============================
 st.markdown("""
 <style>
 body {
@@ -37,9 +46,6 @@ body {
     color:#dbeafe;
     font-size:13px;
 }
-.section {
-    margin-top:26px;
-}
 .intent-box {
     background:#020617;
     padding:12px;
@@ -53,9 +59,9 @@ body {
 </style>
 """, unsafe_allow_html=True)
 
-# -----------------------------
+# =============================
 # Header
-# -----------------------------
+# =============================
 st.markdown("""
 <div class="header">
     <h1>🎙️ BFSI Multilingual Voice Assistant</h1>
@@ -63,21 +69,21 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# -----------------------------
-# OpenAI client
-# -----------------------------
+# =============================
+# OpenAI Client
+# =============================
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# -----------------------------
+# =============================
 # BFSI Intent Taxonomy (20+)
-# -----------------------------
+# =============================
 INTENTS = {
     "Account Balance Inquiry": ["balance", "kitna", "remaining"],
     "Mini Statement": ["mini statement", "last transactions"],
     "Card Block": ["block card", "lost card"],
     "Card Replacement": ["replace card", "new card"],
     "PIN Reset": ["forgot pin", "reset pin"],
-    "Loan Eligibility": ["loan eligibility", "can I get loan"],
+    "Loan Eligibility": ["loan eligibility", "can i get loan"],
     "Loan EMI": ["emi", "monthly installment"],
     "Loan Foreclosure": ["close loan"],
     "Interest Rates": ["interest rate", "roi"],
@@ -96,15 +102,15 @@ INTENTS = {
 }
 
 def detect_intent(text):
-    t = text.lower()
+    text = text.lower()
     for intent, keys in INTENTS.items():
-        if any(k in t for k in keys):
+        if any(k in text for k in keys):
             return intent
     return "General Banking Query"
 
-# -----------------------------
-# Speech to Text (OpenAI)
-# -----------------------------
+# =============================
+# Speech-to-Text (OpenAI)
+# =============================
 def transcribe(audio_path):
     with open(audio_path, "rb") as audio:
         transcript = client.audio.transcriptions.create(
@@ -113,19 +119,19 @@ def transcribe(audio_path):
         )
     return transcript.text
 
-# -----------------------------
+# =============================
 # LLM Reply
-# -----------------------------
+# =============================
 def generate_reply(text, intent, lang):
     prompt = f"""
 You are a BFSI virtual assistant.
 Detected intent: {intent}
 User language: {lang}
 
-Reply in a polite, compliant banking tone.
-Avoid giving sensitive personal data.
+Respond politely, clearly, and in a compliant banking tone.
+Do not expose sensitive data.
 """
-    res = client.chat.completions.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": prompt},
@@ -133,20 +139,20 @@ Avoid giving sensitive personal data.
         ],
         temperature=0.2
     )
-    return res.choices[0].message.content
+    return response.choices[0].message.content
 
-# -----------------------------
-# Text to Speech
-# -----------------------------
+# =============================
+# Text-to-Speech
+# =============================
 def speak(text, lang):
     tts = gTTS(text=text, lang="hi" if lang == "hi" else "en")
     path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
     tts.save(path)
     return path
 
-# -----------------------------
-# Input options
-# -----------------------------
+# =============================
+# Input Options
+# =============================
 st.markdown("## 🎧 Input Options")
 
 mic_audio = st.audio_input("🎙️ Speak now")
@@ -156,23 +162,54 @@ uploaded_file = st.file_uploader(
     type=["wav", "mp3"]
 )
 
+if st.button("🔄 Reset Conversation"):
+    st.session_state.cached_result = None
+    st.session_state.last_call_time = 0
+
 audio = mic_audio or uploaded_file
 
-# -----------------------------
-# Processing
-# -----------------------------
+# =============================
+# Processing (Rate-limit safe)
+# =============================
+COOLDOWN_SECONDS = 15
+
 if audio:
-    with st.spinner("Processing voice..."):
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(audio.read())
-            audio_path = tmp.name
+    now = time.time()
 
-        user_text = transcribe(audio_path)
-        lang = detect(user_text)
-        intent = detect_intent(user_text)
-        reply = generate_reply(user_text, intent, lang)
-        voice_reply = speak(reply, lang)
+    if now - st.session_state.last_call_time < COOLDOWN_SECONDS:
+        st.warning("⏳ Please wait a few seconds before submitting another audio.")
+        st.stop()
 
+    st.session_state.last_call_time = now
+
+    if st.session_state.cached_result:
+        user_text, lang, intent, reply, voice_reply = st.session_state.cached_result
+    else:
+        try:
+            with st.spinner("Processing voice..."):
+                with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                    tmp.write(audio.read())
+                    audio_path = tmp.name
+
+                user_text = transcribe(audio_path)
+                lang = detect(user_text)
+                intent = detect_intent(user_text)
+                reply = generate_reply(user_text, intent, lang)
+                voice_reply = speak(reply, lang)
+
+                st.session_state.cached_result = (
+                    user_text, lang, intent, reply, voice_reply
+                )
+
+        except Exception:
+            st.error(
+                "⚠️ Voice services are temporarily busy. Please try again shortly."
+            )
+            st.stop()
+
+    # =============================
+    # Output
+    # =============================
     st.markdown("### 📝 Transcription")
     st.write(user_text)
 
@@ -188,9 +225,9 @@ if audio:
     st.markdown("### 🔊 Voice Reply")
     st.audio(voice_reply)
 
-# -----------------------------
+# =============================
 # Footer
-# -----------------------------
+# =============================
 st.divider()
 st.markdown("""
 <div style="text-align:center;font-size:13px;color:#94a3b8;padding:24px;">
